@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시간 구하기 게임</title>
+<style>
+    /* 디자인 설정 */
+    body { font-family: 'Verdana', sans-serif; background-color: #f0f9ff; text-align: center; margin: 0; padding: 20px; }
+    .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    h1 { color: #ff6b6b; margin-bottom: 10px; }
+    
+    /* 버튼 스타일 */
+    button { font-family: 'Verdana', sans-serif; cursor: pointer; }
+    .stage-btn { width: 100%; padding: 15px; margin: 5px 0; border: none; border-radius: 10px; font-size: 18px; color: white; font-weight: bold; }
+    .stage-1 { background: #4ecdc4; }
+    .stage-2 { background: #45b7d1; }
+    .stage-3 { background: #ffae62; }
+    .stage-4 { background: #ff6b6b; }
+    .stage-5 { background: #c44569; }
+
+    /* 시계 스타일 */
+    .clocks-area { display: flex; justify-content: space-around; margin: 20px 0; }
+    .clock-box { text-align: center; }
+    .clock { width: 100px; height: 100px; border: 5px solid #333; border-radius: 50%; position: relative; background: white; margin: 0 auto; }
+    .dot { width: 10px; height: 10px; background: red; border-radius: 50%; position: absolute; top: 45px; left: 45px; z-index: 10; }
+    .hand { position: absolute; bottom: 50%; left: 50%; transform-origin: bottom center; border-radius: 5px; }
+    .hour { width: 6px; height: 30px; background: #333; z-index: 5; }
+    .min { width: 4px; height: 40px; background: red; z-index: 6; }
+
+    /* 보기 버튼 */
+    .options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .opt-btn { padding: 15px; background: #e0f7fa; border: 2px solid #b2ebf2; border-radius: 10px; font-size: 18px; color: #006064; }
+    .opt-btn:hover { background: #b2ebf2; }
+    
+    /* 화면 전환용 */
+    .hidden { display: none; }
+    #feedback { font-size: 20px; font-weight: bold; margin: 15px 0; min-height: 30px; }
+    .correct { color: green; }
+    .wrong { color: red; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h1>⏰ 시간 구하기</h1>
+
+    <div id="menu-screen">
+        <p>단계를 선택하세요!</p>
+        <button class="stage-btn stage-1" onclick="startGame(1)">1단계 (쉬움)</button>
+        <button class="stage-btn stage-2" onclick="startGame(2)">2단계 (보통)</button>
+        <button class="stage-btn stage-3" onclick="startGame(3)">3단계 (도전)</button>
+        <button class="stage-btn stage-4" onclick="startGame(4)">4단계 (어려움)</button>
+        <button class="stage-btn stage-5" onclick="startGame(5)">5단계 (왕)</button>
+    </div>
+
+    <div id="game-screen" class="hidden">
+        <div style="display:flex; justify-content:space-between; font-weight:bold; color:#555;">
+            <span id="stage-txt">1단계</span>
+            <span>점수: <span id="score">0</span></span>
+        </div>
+        
+        <div style="background:#fff9db; padding:10px; border-radius:10px; margin-top:10px;">
+            <div id="q-text" style="font-size:18px; font-weight:bold;"></div>
+            <div class="clocks-area">
+                <div class="clock-box">
+                    <div>시작</div>
+                    <div class="clock"><div class="dot"></div><div id="sh" class="hand hour"></div><div id="sm" class="hand min"></div></div>
+                    <div id="st-txt"></div>
+                </div>
+                <div class="clock-box">
+                    <div>끝</div>
+                    <div class="clock"><div class="dot"></div><div id="eh" class="hand hour"></div><div id="em" class="hand min"></div></div>
+                    <div id="et-txt"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="feedback"></div>
+        <div id="options" class="options"></div>
+        <button onclick="goHome()" style="margin-top:20px; padding:10px; background:#ccc; border:none; border-radius:5px;">메뉴로 나가기</button>
+    </div>
+
+    <div id="end-screen" class="hidden">
+        <h2 style="color:#2e86de;">🎉 단계 클리어! 🎉</h2>
+        <p id="end-msg"></p>
+        <button class="stage-btn stage-1" onclick="goHome()">메뉴로 돌아가기</button>
+    </div>
+</div>
+
+<script>
+    // 설정
+    const qsPerStage = 5; 
+    const easyMins = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]; // 5분 단위
+
+    // 변수
+    let stage = 1, qCount = 0, score = 0, ans = "";
+
+    // 화면 전환 함수
+    function show(id) {
+        ['menu-screen', 'game-screen', 'end-screen'].forEach(s => document.getElementById(s).classList.add('hidden'));
+        document.getElementById(id).classList.remove('hidden');
+    }
+
+    function goHome() { show('menu-screen'); }
+
+    function startGame(s) {
+        stage = s; qCount = 0; score = 0;
+        document.getElementById('stage-txt').innerText = stage + "단계";
+        document.getElementById('score').innerText = "0";
+        show('game-screen');
+        nextQ();
+    }
+
+    // 유틸리티
+    function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+    function randMin() { return easyMins[rand(0, easyMins.length - 1)]; }
+    function fmt(h, m) {
+        let p = h >= 12 ? "오후" : "오전";
+        if (h >= 24) p = "다음날 새벽"; else if (h < 6) p = "새벽"; else if (h >= 22) p = "밤";
+        let dh = h % 12 || 12;
+        return `${p} ${dh}시 ${m.toString().padStart(2,'0')}분`;
+    }
+    function fmtDur(m) {
+        let h = Math.floor(m/60), mm = m%60;
+        return h > 0 && mm > 0 ? `${h}시간 ${mm}분` : (h > 0 ? `${h}시간` : `${mm}분`);
+    }
+
+    // 문제 생성
+    function nextQ() {
+        if (qCount >= qsPerStage) {
+            document.getElementById('end-msg').innerText = `총 점수: ${score}점`;
+            show('end-screen');
+            return;
+        }
+        
+        document.getElementById('feedback').innerText = "";
+        document.getElementById('options').innerHTML = "";
+
+        // 문제 로직 (5분 단위 유지)
+        let sH = rand(8, 11), sM = randMin(), add = 0;
+
+        if (stage === 1) { add = 5 * rand(2, 8); if (sM + add >= 60) sM = 0; } // 1단계: 시 안 넘김
+        else if (stage === 2) { add = 5 * rand(4, 20); } // 2단계
+        else if (stage === 3) { sH = rand(13, 18); add = 5 * rand(10, 30); } // 3단계
+        else if (stage === 4) { sH = 11; add = 5 * rand(14, 36); } // 4단계 (12시 넘김)
+        else { sH = rand(21, 23); add = 5 * rand(24, 60); } // 5단계 (날짜 넘김)
+
+        let totalS = sH * 60 + sM;
+        let totalE = totalS + add;
+        let eH = Math.floor(totalE / 60), eM = totalE % 60;
+
+        // 정답 및 시계 설정
+        ans = fmtDur(add);
+        
+        // 시계 침 돌리기
+        document.getElementById('sh').style.transform = `rotate(${(sH%12)*30 + sM*0.5}deg)`;
+        document.getElementById('sm').style.transform = `rotate(${sM*6}deg)`;
+        document.getElementById('st-txt').innerText = fmt(sH, sM);
+
+        document.getElementById('eh').style.transform = `rotate(${(eH%12)*30 + eM*0.5}deg)`;
+        document.getElementById('em').style.transform = `rotate(${eM*6}deg)`;
+        document.getElementById('et-txt').innerText = fmt(eH, eM);
+
+        document.getElementById('q-text').innerHTML = `<span style="color:blue">${fmt(sH, sM)}</span> 시작,<br><span style="color:red">${fmt(eH, eM)}</span> 끝!`;
+
+        // 보기 만들기
+        let opts = new Set([ans]);
+        while(opts.size < 4) {
+            let fake = add + (Math.random() < 0.5 ? 10 : -10); // 10분 차이 오답
+            if (Math.random() < 0.3) fake = add + 60; // 1시간 차이 오답
+            if (fake > 0 && fake !== add) opts.add(fmtDur(fake));
+            else opts.add(fmtDur(add + opts.size * 5 + 5));
+        }
+        
+        Array.from(opts).sort(() => Math.random()-0.5).forEach(o => {
+            let btn = document.createElement('button');
+            btn.className = 'opt-btn';
+            btn.innerText = o;
+            btn.onclick = () => check(o, btn);
+            document.getElementById('options').appendChild(btn);
+        });
+    }
+
+    function check(val, btn) {
+        let f = document.getElementById('feedback');
+        if (val === ans) {
+            f.innerText = "딩동댕! 정답! ⭕"; f.className = "correct"; btn.style.background = "#c8e6c9";
+            score += 20; document.getElementById('score').innerText = score;
+            qCount++;
+            setTimeout(nextQ, 1000);
+        } else {
+            f.innerText = "땡! 다시 해봐요 ❌"; f.className = "wrong"; btn.style.background = "#ffcdd2";
+        }
+    }
+</script>
+
+</body>
+</html>
